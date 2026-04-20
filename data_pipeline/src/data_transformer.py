@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 
 from .utils import load_yaml_config
+from .write_dispatcher import WriteDispatcher
 
 
 # Имя типа → метод ``_col_<name>``
@@ -49,37 +50,37 @@ class DataTransformer:
         p = Path(raw)
         return p.resolve() if p.is_absolute() else (base_dir / p).resolve()
 
-    def input_dir(self) -> Path:
+    def input_dir(self) -> str:
         base = self.config_path.parent
         raw = self.transform_cfg.get("input_dir")
         if raw:
-            return self._resolve_path(str(raw), base)
+            return WriteDispatcher.resolve_uri_or_path(str(raw), base)
         raw = self.config.get("data_loader", {}).get("output_dir")
         if not raw:
             raise ValueError("set data_loader.output_dir or transform.input_dir in config.yaml")
-        return self._resolve_path(str(raw), base)
+        return WriteDispatcher.resolve_uri_or_path(str(raw), base)
 
-    def output_dir(self) -> Path:
+    def output_dir(self) -> str:
         raw = self.transform_cfg.get("output_dir")
         if not raw:
             raise ValueError("set transform.output_dir in config.yaml")
-        return self._resolve_path(str(raw), self.config_path.parent)
+        return WriteDispatcher.resolve_uri_or_path(str(raw), self.config_path.parent)
 
-    def partition_path(self, load_date: str, input: bool = True) -> Path:
+    def partition_path(self, load_date: str, input: bool = True) -> str:
         root = self.input_dir() if input else self.output_dir()
-        return root / f"load_date={load_date}.parquet"
+        return f"{root}/load_date={load_date}.parquet"
 
     def read_partition(self, load_date: str) -> pd.DataFrame:
         path = self.partition_path(load_date, input=True)
-        if not path.is_file():
+        if not path.startswith("s3://") and not Path(path).is_file():
             raise FileNotFoundError(path)
-        return pd.read_parquet(path)
+        storage_options = WriteDispatcher.s3_options_from_config(self.config) if path.startswith("s3://") else None
+        return pd.read_parquet(path, storage_options=storage_options)
 
-    def save_partition(self, df: pd.DataFrame, load_date: str) -> Path:
+    def save_partition(self, df: pd.DataFrame, load_date: str) -> str:
         path = self.partition_path(load_date, input=False)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        df.to_parquet(path, index=False)
-        return path
+        writer = WriteDispatcher(s3_storage_options=WriteDispatcher.s3_options_from_config(self.config))
+        return writer.save_parquet(df, path, index=False)
 
     def features_to_select(self) -> list[str]:
         return list(self.transform_cfg.get("features_to_select", []))
@@ -195,7 +196,7 @@ class DataTransformer:
                 out = self._apply_column_transform(out, col, t)
         return out
 
-    def run(self, load_date: str) -> Path:
+    def run(self, load_date: str) -> str:
         """read → transform_features → save."""
         df = self.read_partition(load_date)
         return self.save_partition(self.transform_features(df), load_date)

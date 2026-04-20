@@ -11,6 +11,7 @@ import pyarrow as pa
 import requests
 
 from .utils import load_yaml_config
+from .write_dispatcher import WriteDispatcher
 
 
 N_POSTS_PER_QUERY = 100
@@ -36,11 +37,9 @@ class DataLoader:
     def _dl(self) -> dict[str, Any]:
         return self.config.get("data_loader", {})
 
-    def output_dir(self) -> Path:
-        p = Path(self._dl().get("output_dir", "artifacts/raw"))
-        if not p.is_absolute():
-            p = (self.config_path.parent / p).resolve()
-        return p
+    def output_dir(self) -> str:
+        raw = str(self._dl().get("output_dir", "artifacts/raw"))
+        return WriteDispatcher.resolve_uri_or_path(raw, self.config_path.parent)
 
     def features_to_select(self) -> list[str]:
         return list(self._dl().get("features_to_select", []))
@@ -155,21 +154,20 @@ class DataLoader:
         """Сырой df → только features_to_select."""
         return self.select_columns(self.load_raw(load_date))
 
-    def partition_path(self, load_date: date | str) -> Path:
+    def partition_path(self, load_date: date | str) -> str:
         d = load_date if isinstance(load_date, date) else date.fromisoformat(str(load_date))
         name = f"load_date={d.isoformat()}.parquet"
-        return self.output_dir() / name
+        return f"{self.output_dir()}/{name}"
 
-    def save_partition(self, df: pd.DataFrame, load_date: date | str) -> Path:
+    def save_partition(self, df: pd.DataFrame, load_date: date | str) -> str:
         """Сохранить партицию: всегда только features_to_select + безопасные типы для Parquet."""
         path = self.partition_path(load_date)
-        path.parent.mkdir(parents=True, exist_ok=True)
         narrowed = self.select_columns(df)
         safe = self._check_columns_for_parquet(narrowed)
-        safe.to_parquet(path, index=False)
-        return path
+        writer = WriteDispatcher(s3_storage_options=WriteDispatcher.s3_options_from_config(self.config))
+        return writer.save_parquet(safe, path, index=False)
 
-    def run(self, load_date: date | str) -> Path:
+    def run(self, load_date: date | str) -> str:
         """Загрузить, отфильтровать колонки, сохранить партицию."""
         df = self.load_and_select(load_date)
         return self.save_partition(df, load_date)
