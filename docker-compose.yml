@@ -26,7 +26,7 @@ services:
     image: mlops-airflow:2.10.2
     build:
       context: .
-      dockerfile: Dockerfile.airflow
+      dockerfile: dags/docker/Dockerfile
     container_name: airflow-init
     depends_on:
       - postgres
