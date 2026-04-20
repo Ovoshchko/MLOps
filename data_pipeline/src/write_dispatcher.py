@@ -15,6 +15,10 @@ class WriteDispatcher:
     def __init__(self, s3_storage_options: dict[str, Any] | None = None):
         self.s3_storage_options = s3_storage_options or {}
 
+    @classmethod
+    def from_config(cls, config: dict[str, Any]) -> "WriteDispatcher":
+        return cls(s3_storage_options=cls.s3_options_from_config(config))
+
     @staticmethod
     def is_s3_path(save_path: str) -> bool:
         return save_path.startswith("s3://")
@@ -48,10 +52,22 @@ class WriteDispatcher:
             p = (base_dir / p).resolve()
         return str(p)
 
+    @staticmethod
+    def partition_path(root: str, load_date: str) -> str:
+        return f"{root.rstrip('/')}/load_date={load_date}.parquet"
+
     def save_parquet(self, df: pd.DataFrame, save_path: str, index: bool = False) -> str:
         if self.is_s3_path(save_path):
             return self._save_s3(df, save_path, index=index)
         return self._save_local(df, save_path, index=index)
+
+    def read_parquet(self, path: str) -> pd.DataFrame:
+        if self.is_s3_path(path):
+            return pd.read_parquet(path, storage_options=self.s3_storage_options)
+        local_path = Path(path)
+        if not local_path.is_file():
+            raise FileNotFoundError(path)
+        return pd.read_parquet(local_path)
 
     def _save_local(self, df: pd.DataFrame, save_path: str, index: bool = False) -> str:
         path = Path(save_path)

@@ -30,6 +30,7 @@ class DataTransformer:
     def __init__(self, config_path: str | Path):
         self.config_path = Path(config_path).resolve()
         self._config: dict[str, Any] | None = None
+        self._writer: WriteDispatcher | None = None
 
     @property
     def config(self) -> dict[str, Any]:
@@ -38,17 +39,17 @@ class DataTransformer:
         return self._config
 
     @property
+    def writer(self) -> WriteDispatcher:
+        if self._writer is None:
+            self._writer = WriteDispatcher.from_config(self.config)
+        return self._writer
+
+    @property
     def transform_cfg(self) -> dict[str, Any]:
         cfg = self.config.get("transform")
         if not cfg:
             raise ValueError("config.yaml: missing top-level key 'transform'")
         return cfg
-
-    def _resolve_path(self, raw: str | None, base_dir: Path) -> Path:
-        if not raw:
-            raise ValueError("path is empty")
-        p = Path(raw)
-        return p.resolve() if p.is_absolute() else (base_dir / p).resolve()
 
     def input_dir(self) -> str:
         base = self.config_path.parent
@@ -68,19 +69,15 @@ class DataTransformer:
 
     def partition_path(self, load_date: str, input: bool = True) -> str:
         root = self.input_dir() if input else self.output_dir()
-        return f"{root}/load_date={load_date}.parquet"
+        return WriteDispatcher.partition_path(root, load_date)
 
     def read_partition(self, load_date: str) -> pd.DataFrame:
         path = self.partition_path(load_date, input=True)
-        if not path.startswith("s3://") and not Path(path).is_file():
-            raise FileNotFoundError(path)
-        storage_options = WriteDispatcher.s3_options_from_config(self.config) if path.startswith("s3://") else None
-        return pd.read_parquet(path, storage_options=storage_options)
+        return self.writer.read_parquet(path)
 
     def save_partition(self, df: pd.DataFrame, load_date: str) -> str:
         path = self.partition_path(load_date, input=False)
-        writer = WriteDispatcher(s3_storage_options=WriteDispatcher.s3_options_from_config(self.config))
-        return writer.save_parquet(df, path, index=False)
+        return self.writer.save_parquet(df, path, index=False)
 
     def features_to_select(self) -> list[str]:
         return list(self.transform_cfg.get("features_to_select", []))

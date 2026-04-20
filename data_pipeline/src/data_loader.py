@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import time
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -12,9 +12,6 @@ import requests
 
 from .utils import load_yaml_config
 from .write_dispatcher import WriteDispatcher
-
-
-N_POSTS_PER_QUERY = 100
 
 
 class DataLoader:
@@ -27,12 +24,19 @@ class DataLoader:
     def __init__(self, config_path: str | Path):
         self.config_path = Path(config_path).resolve()
         self._config: dict[str, Any] | None = None
+        self._writer: WriteDispatcher | None = None
 
     @property
     def config(self) -> dict[str, Any]:
         if self._config is None:
             self._config = load_yaml_config(str(self.config_path))
         return self._config
+
+    @property
+    def writer(self) -> WriteDispatcher:
+        if self._writer is None:
+            self._writer = WriteDispatcher.from_config(self.config)
+        return self._writer
 
     def _dl(self) -> dict[str, Any]:
         return self.config.get("data_loader", {})
@@ -156,16 +160,14 @@ class DataLoader:
 
     def partition_path(self, load_date: date | str) -> str:
         d = load_date if isinstance(load_date, date) else date.fromisoformat(str(load_date))
-        name = f"load_date={d.isoformat()}.parquet"
-        return f"{self.output_dir()}/{name}"
+        return WriteDispatcher.partition_path(self.output_dir(), d.isoformat())
 
     def save_partition(self, df: pd.DataFrame, load_date: date | str) -> str:
         """Сохранить партицию: всегда только features_to_select + безопасные типы для Parquet."""
         path = self.partition_path(load_date)
         narrowed = self.select_columns(df)
         safe = self._check_columns_for_parquet(narrowed)
-        writer = WriteDispatcher(s3_storage_options=WriteDispatcher.s3_options_from_config(self.config))
-        return writer.save_parquet(safe, path, index=False)
+        return self.writer.save_parquet(safe, path, index=False)
 
     def run(self, load_date: date | str) -> str:
         """Загрузить, отфильтровать колонки, сохранить партицию."""
