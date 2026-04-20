@@ -1,0 +1,99 @@
+data_loader:
+  target_col: num_comments
+  output_dir: artifacts/raw
+  subreddit_name: technology
+  max_posts_per_day: 5000
+  base_url: https://arctic-shift.photon-reddit.com/api/posts/search
+  request_sleep_seconds: 0.5
+  n_posts_per_query: 100
+  text_vectorizer: intfloat/multilingual-e5-small
+  raw_csv_path: null
+  features_to_select:
+    - author
+    - author_fullname
+    - author_premium
+    - domain
+    - is_crosspostable
+    - is_reddit_media_domain
+    - is_robot_indexable
+    - is_self
+    - link_flair_css_class
+    - link_flair_template_id
+    - link_flair_text
+    - locked
+    - media
+    - media_embed
+    - no_follow
+    - num_comments
+    - num_crossposts
+    - over_18
+    - removed_by_category
+    - secure_media
+    - secure_media_embed
+    - send_replies
+    - subreddit_subscribers
+    - thumbnail
+    - thumbnail_height
+    - thumbnail_width
+    - title
+    - post_hint
+    - preview
+    - crosspost_parent
+    - crosspost_parent_list
+
+# DataTransformer: input_dir null → data_loader.output_dir
+transform:
+  input_dir: null
+  output_dir: artifacts/transformed
+  embedding_batch_size: 32
+  features_to_select:
+    - author
+    - author_fullname
+    - author_premium
+    - domain
+    - is_crosspostable
+    - is_reddit_media_domain
+    - is_robot_indexable
+    - is_self
+    - link_flair_css_class
+    - link_flair_template_id
+    - link_flair_text
+    - locked
+    - media
+    - media_embed
+    - no_follow
+    - num_comments
+    - num_crossposts
+    - over_18
+    - removed_by_category
+    - secure_media
+    - secure_media_embed
+    - send_replies
+    - subreddit_subscribers
+    - thumbnail
+    - thumbnail_height
+    - thumbnail_width
+    - title
+    - post_hint
+    - preview
+    - crosspost_parent
+    - crosspost_parent_list
+  # Опционально: только перечисленные колонки получают доп. шаги (по порядку в списке).
+  # Типы: embed | log1p | coerce_bool | json_to_string
+  column_transforms:
+    title: embed
+    subreddit_subscribers: log1p
+    media: json_to_string
+    media_embed: json_to_string
+    secure_media: json_to_string
+    secure_media_embed: json_to_string
+    preview: json_to_string
+    is_crosspostable: coerce_bool
+    is_reddit_media_domain: coerce_bool
+    is_robot_indexable: coerce_bool
+    is_self: coerce_bool
+    locked: coerce_bool
+    no_follow: coerce_bool
+    over_18: coerce_bool
+    send_replies: coerce_bool
+    author_premium: coerce_bool
