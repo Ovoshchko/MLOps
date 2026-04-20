@@ -1,35 +1,34 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
+from dotenv import load_dotenv
 
 
 class WriteDispatcher:
-    """
-    Универсальный диспетчер записи parquet.
-    Определяет тип пути (локальный/s3) и вызывает соответствующий метод.
-    """
-
     def __init__(self, s3_storage_options: dict[str, Any] | None = None):
         self.s3_storage_options = s3_storage_options or {}
 
     @classmethod
-    def from_config(cls, config: dict[str, Any]) -> "WriteDispatcher":
-        return cls(s3_storage_options=cls.s3_options_from_config(config))
+    def from_env(cls, env_path: Path | None = None) -> "WriteDispatcher":
+        return cls(s3_storage_options=cls.s3_options_from_env(env_path=env_path))
 
     @staticmethod
     def is_s3_path(save_path: str) -> bool:
         return save_path.startswith("s3://")
 
     @classmethod
-    def s3_options_from_config(cls, config: dict[str, Any]) -> dict[str, Any]:
-        s3 = config.get("s3", {}) or {}
-        endpoint = s3.get("endpoint_url")
-        key = s3.get("access_key")
-        secret = s3.get("secret_key")
-        secure = bool(s3.get("secure", True))
+    def s3_options_from_env(cls, env_path: Path | None = None) -> dict[str, Any]:
+        load_dotenv(dotenv_path=env_path, override=False)
+        endpoint = os.getenv("S3_ENDPOINT_URL")
+        key = os.getenv("S3_ACCESS_KEY")
+        secret = os.getenv("S3_SECRET_KEY")
+        secure_raw = os.getenv("S3_SECURE")
+        secure = True if secure_raw is None else str(secure_raw).strip().lower() in ("1", "true", "yes", "on")
+
         if not (endpoint and key and secret):
             return {}
         return {

@@ -15,12 +15,6 @@ from .write_dispatcher import WriteDispatcher
 
 
 class DataLoader:
-    """
-    Загрузка сырых данных и сохранение в parquet без изменения значений ячеек.
-    Оставляет только колонки из config.yaml → data_loader.features_to_select.
-    Имя файла-партиции: load_date=YYYY-MM-DD.parquet
-    """
-
     def __init__(self, config_path: str | Path):
         self.config_path = Path(config_path).resolve()
         self._config: dict[str, Any] | None = None
@@ -35,7 +29,7 @@ class DataLoader:
     @property
     def writer(self) -> WriteDispatcher:
         if self._writer is None:
-            self._writer = WriteDispatcher.from_config(self.config)
+            self._writer = WriteDispatcher.from_env(env_path=self.config_path.parent / ".env")
         return self._writer
 
     def _dl(self) -> dict[str, Any]:
@@ -50,10 +44,6 @@ class DataLoader:
 
     @staticmethod
     def _materialize_column_for_parquet(s: pd.Series) -> pd.Series:
-        """
-        Столбцы на базе PyArrow (struct/map/list) не всегда имеют dtype object;
-        пустой struct Arrow не пишет в Parquet. Разворачиваем в object + python list/dict.
-        """
         dtype = s.dtype
         if isinstance(dtype, pd.ArrowDtype):
             ap = dtype.pyarrow_dtype
@@ -62,7 +52,6 @@ class DataLoader:
         return s
 
     def select_columns(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Только колонки из конфига, в заданном порядке; лишние (например gildings) отбрасываются."""
         cols = self.features_to_select()
         out = pd.DataFrame(index=df.index)
         for c in cols:
@@ -74,10 +63,6 @@ class DataLoader:
 
     @staticmethod
     def _check_columns_for_parquet(df: pd.DataFrame) -> pd.DataFrame:
-        """
-        PyArrow не пишет пустые struct (частый кейс Reddit: пустой {{}} в dict-поле).
-        Любые dict/list в ячейках сериализуем в JSON-строку.
-        """
         out = df.copy()
 
         def _needs_json_normalize(ser: pd.Series) -> bool:
@@ -151,11 +136,9 @@ class DataLoader:
         return self._fetch_from_api(after=after, before=before)
 
     def load_raw(self, load_date: date | str) -> pd.DataFrame:
-        """Источник по конфигу (CSV или API), полный набор колонок источника."""
         return self._fetch_raw_dataframe(load_date)
 
     def load_and_select(self, load_date: date | str) -> pd.DataFrame:
-        """Сырой df → только features_to_select."""
         return self.select_columns(self.load_raw(load_date))
 
     def partition_path(self, load_date: date | str) -> str:
@@ -163,13 +146,11 @@ class DataLoader:
         return WriteDispatcher.partition_path(self.output_dir(), d.isoformat())
 
     def save_partition(self, df: pd.DataFrame, load_date: date | str) -> str:
-        """Сохранить партицию: всегда только features_to_select + безопасные типы для Parquet."""
         path = self.partition_path(load_date)
         narrowed = self.select_columns(df)
         safe = self._check_columns_for_parquet(narrowed)
         return self.writer.save_parquet(safe, path, index=False)
 
     def run(self, load_date: date | str) -> str:
-        """Загрузить, отфильтровать колонки, сохранить партицию."""
         df = self.load_and_select(load_date)
         return self.save_partition(df, load_date)

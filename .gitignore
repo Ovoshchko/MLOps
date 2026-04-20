@@ -1,5 +1,7 @@
+.*
 venv/
 .ipynb_checkpoints/
 customer_fs/
 data_pipeline/artifacts/
 __pycache__/
+logs/

@@ -1,0 +1,9 @@
+.git
+.gitignore
+.minio
+venv
+.venv
+__pycache__
+*.pyc
+.cursor
+*.ipynb

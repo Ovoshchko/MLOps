@@ -1,6 +1,6 @@
 data_loader:
   target_col: num_comments
-  output_dir: artifacts/raw
+  output_dir: s3://reddit-data/artifacts/raw
   subreddit_name: technology
   max_posts_per_day: 5000
   base_url: https://arctic-shift.photon-reddit.com/api/posts/search
@@ -41,10 +41,9 @@ data_loader:
     - crosspost_parent
     - crosspost_parent_list
 
-# DataTransformer: input_dir null → data_loader.output_dir
 transform:
   input_dir: null
-  output_dir: artifacts/transformed
+  output_dir: s3://reddit-data/artifacts/transformed
   embedding_batch_size: 32
   features_to_select:
     - author
@@ -78,8 +77,6 @@ transform:
     - preview
     - crosspost_parent
     - crosspost_parent_list
-  # Опционально: только перечисленные колонки получают доп. шаги (по порядку в списке).
-  # Типы: embed | log1p | coerce_bool | json_to_string
   column_transforms:
     title: embed
     subreddit_subscribers: log1p

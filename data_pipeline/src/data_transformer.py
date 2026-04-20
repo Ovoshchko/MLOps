@@ -11,7 +11,6 @@ from .utils import load_yaml_config
 from .write_dispatcher import WriteDispatcher
 
 
-# Имя типа → метод ``_col_<name>``
 _COLUMN_TRANSFORM_REGISTRY: dict[str, str] = {
     "embed": "embed",
     "log1p": "log1p",
@@ -21,12 +20,6 @@ _COLUMN_TRANSFORM_REGISTRY: dict[str, str] = {
 
 
 class DataTransformer:
-    """
-    1) Всегда оставляет только ``transform.features_to_select``.
-    2) Для каждой колонки из этого списка, если в ``transform.column_transforms``
-       заданы дополнительные шаги — применяет их по порядку; иначе колонка не меняется.
-    """
-
     def __init__(self, config_path: str | Path):
         self.config_path = Path(config_path).resolve()
         self._config: dict[str, Any] | None = None
@@ -41,7 +34,7 @@ class DataTransformer:
     @property
     def writer(self) -> WriteDispatcher:
         if self._writer is None:
-            self._writer = WriteDispatcher.from_config(self.config)
+            self._writer = WriteDispatcher.from_env(env_path=self.config_path.parent / ".env")
         return self._writer
 
     @property
@@ -83,7 +76,6 @@ class DataTransformer:
         return list(self.transform_cfg.get("features_to_select", []))
 
     def column_transforms(self) -> dict[str, list[str]]:
-        """Имя колонки → упорядоченный список типов трансформаций (строки)."""
         raw = self.transform_cfg.get("column_transforms") or {}
         out: dict[str, list[str]] = {}
         for k, v in raw.items():
@@ -182,7 +174,6 @@ class DataTransformer:
         return method(df, col)
 
     def transform_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Обязательный отбор фич, затем опциональные трансформации по конфигу (по колонкам)."""
         out = self._select_features(df)
         transforms = self.column_transforms()
 
@@ -194,6 +185,5 @@ class DataTransformer:
         return out
 
     def run(self, load_date: str) -> str:
-        """read → transform_features → save."""
         df = self.read_partition(load_date)
         return self.save_partition(self.transform_features(df), load_date)
