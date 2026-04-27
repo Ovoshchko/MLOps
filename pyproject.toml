@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mlops-lab"
+version = "0.1.0"
+description = "Infrastructure for Reddit data collection and ML experimentation."
+requires-python = ">=3.10"
+dependencies = [
+  "catboost>=1.2",
+  "matplotlib>=3.8",
+  "mlflow==3.10.1",
+  "optuna>=4.0",
+  "pandas>=2.0",
+  "pyarrow>=14.0",
+  "s3fs>=2024.0.0",
+  "python-dotenv>=1.0.0",
+  "PyYAML>=6.0",
+  "requests>=2.28",
+  "sentence-transformers>=2.2",
+]
+
+[project.scripts]
+manual-backfill = "data_pipeline.manual_backfill:main"
+register-processed-dataset = "data_pipeline.register_dataset:main"
+train-experiment = "experiments.train_experiment:main"
+tune-experiment = "experiments.tune_experiment:main"
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.6.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["data_pipeline*", "experiments*"]
+
+[tool.uv]
+package = true

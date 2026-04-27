@@ -1,0 +1,8 @@
+dataset_registration:
+  pipeline_config_path: data_pipeline/config.yaml
+  dataset_id: null
+  version: v1
+  dataset_root: null
+  partition_paths: []
+  date_from: "2025-03-01"
+  date_to: "2026-03-01"

@@ -1,7 +1,15 @@
 .*
+.DS_Store
 venv/
+.venv/
 .ipynb_checkpoints/
+.minio/
 customer_fs/
 data_pipeline/artifacts/
 __pycache__/
 logs/
+mlartifacts/
+mlflow.db
+catboost_info
+mlops_lab.egg-info
+uv.lock

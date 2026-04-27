@@ -1,0 +1,27 @@
+dataset:
+  manifest_uri: s3://reddit-data/datasets/processed/reddit_technology_2025-03-01_2026-03-01_v1/manifest.json
+  env_path: data_pipeline/.env
+
+split:
+  train_size: 0.7
+  val_size: 0.15
+  test_size: 0.15
+  seed: 42
+  shuffle: true
+
+target:
+  transform: log1p
+
+model:
+  name: catboost
+  iterations: 500
+  learning_rate: 0.05
+  depth: 6
+  l2_leaf_reg: 3.0
+  seed: 42
+  early_stopping_rounds: 50
+
+mlflow:
+  tracking_uri: http://localhost:5001
+  experiment_name: boosting-log-target
+  run_name: catboost-log-target-v1

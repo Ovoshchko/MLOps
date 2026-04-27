@@ -1,0 +1,5 @@
+backfill:
+  pipeline_config_path: data_pipeline/config.yaml
+  date_from: "2025-11-23"
+  date_to: "2026-03-01"
+  stop_on_error: true

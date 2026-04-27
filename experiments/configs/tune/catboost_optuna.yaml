@@ -1,0 +1,45 @@
+dataset:
+  manifest_uri: s3://reddit-data/datasets/processed/reddit_technology_2025-03-01_2026-03-01_v1/manifest.json
+  env_path: data_pipeline/.env
+
+split:
+  train_size: 0.7
+  val_size: 0.15
+  test_size: 0.15
+  seed: 42
+  shuffle: true
+
+model:
+  name: catboost
+  seed: 42
+  early_stopping_rounds: 50
+
+optuna:
+  study_name: catboost_tuning_v1
+  n_trials: 30
+  direction: minimize
+  metric: val_rmse
+  sampler_seed: 42
+  storage_uri: null
+  load_if_exists: false
+
+search_space:
+  iterations:
+    low: 200
+    high: 1200
+  learning_rate:
+    low: 0.01
+    high: 0.2
+    log: true
+  depth:
+    low: 4
+    high: 10
+  l2_leaf_reg:
+    low: 1.0
+    high: 10.0
+    log: true
+
+mlflow:
+  tracking_uri: http://localhost:5001
+  experiment_name: optuna-catboost
+  run_name: catboost-optuna-v1
