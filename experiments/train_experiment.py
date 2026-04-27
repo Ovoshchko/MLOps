@@ -207,11 +207,6 @@ def _run_ridge(prepared: dict[str, Any], model_params: dict[str, Any], *, target
     )
     _log_common_plots(prepared, test_pred)
 
-    print(f"test_rmse={metrics['test_rmse']:.4f}")
-    print(f"test_mae={metrics['test_mae']:.4f}")
-    print(f"test_r2={metrics['test_r2']:.4f}")
-
-
 def _run_catboost(prepared: dict[str, Any], model_params: dict[str, Any], *, target_transform: str) -> None:
     training_prepared = _prepare_training_targets(prepared, target_transform)
     result = _fit_and_predict_catboost(training_prepared, model_params)
@@ -268,12 +263,6 @@ def _run_catboost(prepared: dict[str, Any], model_params: dict[str, Any], *, tar
 
     _log_common_plots(prepared, test_pred)
 
-    print(f"best_iteration={model.get_best_iteration()}")
-    print(f"test_rmse={metrics['test_rmse']:.4f}")
-    print(f"test_mae={metrics['test_mae']:.4f}")
-    print(f"test_r2={metrics['test_r2']:.4f}")
-
-
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run experiment from config.")
     parser.add_argument("--config", default="experiments/configs/train/ridge.yaml")
@@ -310,11 +299,6 @@ def main() -> None:
     model_params = dict(config["model"])
     model_name = str(model_params.pop("name")).lower()
     run_name = str(config["mlflow"].get("run_name", f"{model_name}-experiment"))
-
-    print(f"rows={len(df)}")
-    print(f"train_rows={len(split['train_df'])}")
-    print(f"val_rows={len(split['val_df'])}")
-    print(f"test_rows={len(split['test_df'])}")
 
     with start_run(run_name, tags={"model": model_name, "stage": "experiment"}):
         log_dataset(manifest, df)

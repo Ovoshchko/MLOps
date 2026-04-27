@@ -247,11 +247,6 @@ def main() -> None:
     search_space = config["search_space"]
     run_name = str(config["mlflow"].get("run_name", "catboost-optuna"))
 
-    print(f"rows={len(df)}")
-    print(f"train_rows={len(split['train_df'])}")
-    print(f"val_rows={len(split['val_df'])}")
-    print(f"test_rows={len(split['test_df'])}")
-
     sampler = optuna.samplers.TPESampler(seed=int(optuna_config.get("sampler_seed", 42)))
     storage_uri = optuna_config.get("storage_uri")
     if storage_uri in ("", None):
@@ -355,14 +350,6 @@ def main() -> None:
         mlflow.log_dict(trials_summary, "optuna/trials.json")
 
         _log_parent_artifacts(prepared, best_model, test_pred)
-
-    print(f"best_trial={study.best_trial.number}")
-    print(f"best_params={study.best_params}")
-    print(f"best_val_rmse={study.best_value:.4f}")
-    print(f"test_rmse={best_metrics['test_rmse']:.4f}")
-    print(f"test_mae={best_metrics['test_mae']:.4f}")
-    print(f"test_r2={best_metrics['test_r2']:.4f}")
-
 
 if __name__ == "__main__":
     main()
