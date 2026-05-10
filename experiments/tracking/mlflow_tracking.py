@@ -8,10 +8,9 @@ import mlflow
 import mlflow.catboost
 import mlflow.data
 import mlflow.onnx
-import onnx
 import numpy as np
+import onnx
 import pandas as pd
-import yaml
 
 
 def configure_mlflow(
@@ -21,10 +20,6 @@ def configure_mlflow(
 ) -> None:
     mlflow.set_tracking_uri(tracking_uri or os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5001"))
     mlflow.set_experiment(experiment_name or os.getenv("MLFLOW_EXPERIMENT_NAME", "baseline"))
-
-
-def get_data_schema():
-    schema = mlflow.artifacts.download_artifacts("")
 
 
 @contextmanager

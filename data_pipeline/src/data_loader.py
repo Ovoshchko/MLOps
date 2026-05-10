@@ -10,7 +10,8 @@ import pandas as pd
 import pyarrow as pa
 import requests
 
-from .utils import load_yaml_config
+from common.yaml import load_yaml_config
+
 from .write_dispatcher import WriteDispatcher
 
 

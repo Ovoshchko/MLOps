@@ -1,4 +1,3 @@
-import os
 from abc import ABC, abstractmethod
 from typing import Any, Union
 
@@ -15,7 +14,7 @@ class ONNXConverter(ABC):
 class CatBoostONNXConverter(ONNXConverter):
     def __init__(self, model: Union[str, Any]):
         self.model = None
-        
+
         if isinstance(model, str):
             self.model = self._load_model(model)
         else:
@@ -29,7 +28,6 @@ class CatBoostONNXConverter(ONNXConverter):
 
     def _load_model_from_mlflow(self, model_path: str) -> Any:
         run_id = model_path.split("/")[-2]
-        mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5001"))
         model = mlflow.pyfunc.load_model(f"runs:/{run_id}/model")
         return model.get_raw_model()
     

@@ -1,5 +1,6 @@
 import json
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import mlflow
 import numpy as np
@@ -9,15 +10,15 @@ from fastapi import FastAPI, Request
 from pydantic import BaseModel, ConfigDict
 from sentence_transformers import SentenceTransformer
 
+from common.yaml import load_yaml_config
 from experiments.features.build import apply_feature_engineering, build_X, infer_feature_columns
 from experiments.tracking.mlflow_tracking import configure_mlflow
 from inference.utils.online_transform import transform_features
 from inference.utils.predict_schema import build_input_row_model, manifest_defaults
-from inference.utils.yaml import read_yaml_config
 
 
 configure_mlflow()
-config = read_yaml_config("config.yml")
+config = load_yaml_config(str(Path(__file__).parent / "config.yml"))
 
 
 def load_manifest(uri: str) -> dict:

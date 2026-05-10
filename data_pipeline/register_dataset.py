@@ -4,7 +4,7 @@ import argparse
 import hashlib
 import json
 from dataclasses import asdict, dataclass, field
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -12,24 +12,12 @@ import dotenv
 import fsspec
 import pyarrow.parquet as pq
 
+from common.yaml import load_yaml_config
 from data_pipeline.script_configs import DatasetRegistrationConfig
-from data_pipeline.src.utils import load_yaml_config
+from data_pipeline.src.utils import iter_dates
 from data_pipeline.src.write_dispatcher import WriteDispatcher
 
 dotenv.load_dotenv()
-
-def _iter_dates(date_from: str, date_to: str) -> list[str]:
-    start = date.fromisoformat(date_from)
-    end = date.fromisoformat(date_to)
-    if start > end:
-        raise ValueError(f"date_from must be <= date_to, got {date_from} > {date_to}")
-
-    days: list[str] = []
-    current = start
-    while current <= end:
-        days.append(current.isoformat())
-        current += timedelta(days=1)
-    return days
 
 
 def _bucket_root(uri: str) -> str:
@@ -109,7 +97,7 @@ class DatasetRegistrar:
         if registration.date_from and registration.date_to:
             return [
                 WriteDispatcher.partition_path(self.processed_root, load_date)
-                for load_date in _iter_dates(registration.date_from, registration.date_to)
+                for load_date in iter_dates(registration.date_from, registration.date_to)
             ]
 
         raise ValueError("set dataset_registration.partition_paths or both date_from/date_to")

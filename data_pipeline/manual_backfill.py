@@ -1,26 +1,12 @@
 from __future__ import annotations
 
 import argparse
-from datetime import date, timedelta
 
 import dotenv
 from data_pipeline.script_configs import BackfillConfig
 from data_pipeline.src.data_loader import DataLoader
 from data_pipeline.src.data_transformer import DataTransformer
-
-
-def _iter_dates(date_from: str, date_to: str) -> list[str]:
-    start = date.fromisoformat(date_from)
-    end = date.fromisoformat(date_to)
-    if start > end:
-        raise ValueError(f"date_from must be <= date_to, got {date_from} > {date_to}")
-
-    days: list[str] = []
-    current = start
-    while current <= end:
-        days.append(current.isoformat())
-        current += timedelta(days=1)
-    return days
+from data_pipeline.src.utils import iter_dates
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -45,7 +31,7 @@ def main() -> None:
     loader = DataLoader(config_path=pipeline_config_path)
     transformer = DataTransformer(config_path=pipeline_config_path)
 
-    for load_date in _iter_dates(date_from, date_to):
+    for load_date in iter_dates(date_from, date_to):
         try:
             raw_path = loader.run(load_date=load_date)
             transformed_path = transformer.run(load_date=load_date)

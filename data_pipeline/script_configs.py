@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from data_pipeline.src.utils import load_yaml_config
+from common.yaml import load_yaml_config
 
 
 @dataclass(frozen=True)

@@ -1,12 +1,9 @@
-"""Tolerant per-row Pydantic model and type defaults derived from the dataset manifest."""
-
 from __future__ import annotations
 
 from typing import Any
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, create_model
 
-# (python type, default value) per manifest type string.
 _TYPE_TABLE: dict[str, tuple[type, Any]] = {
     "string":       (str,   ""),
     "large_string": (str,   ""),
@@ -38,16 +35,6 @@ def build_input_row_model(
     manifest: dict,
     field_aliases: dict[str, str] | None = None,
 ) -> type[BaseModel]:
-    """Pydantic row model derived from ``manifest['features']``.
-
-    - Unknown keys are dropped (``extra='ignore'``) so upstream schema growth
-      does not break the service.
-    - Each known field is ``Optional[T]`` with default ``None`` -> missing keys
-      and explicit ``null`` are tolerated.
-    - Wrong types raise ``ValidationError`` -> HTTP 422 with a clear message.
-    - ``field_aliases`` maps ``source_key -> manifest_feature_name``. The model
-      will accept either the manifest name or the source alias on input.
-    """
     field_aliases = field_aliases or {}
     inv: dict[str, list[str]] = {}
     for src, dst in field_aliases.items():
@@ -72,7 +59,6 @@ def build_input_row_model(
 
 
 def manifest_defaults(manifest: dict) -> dict[str, Any]:
-    """Map ``feature_name -> default_value`` for filling missing/null inputs."""
     type_by_name = {c["name"]: c["type"] for c in manifest["schema"]}
     return {
         name: _python_type_and_default(type_by_name[name])[1]

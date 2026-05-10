@@ -1,13 +1,18 @@
-import yaml
-from typing import Any
+from __future__ import annotations
+
+from datetime import date, timedelta
 
 
-def load_yaml_config(path: str) -> dict[str, Any]:
-    with open(path, "r", encoding="utf-8") as file:
-        config = yaml.safe_load(file)
+def iter_dates(date_from: str, date_to: str) -> list[str]:
+    """Inclusive date range as a list of ``YYYY-MM-DD`` strings."""
+    start = date.fromisoformat(date_from)
+    end = date.fromisoformat(date_to)
+    if start > end:
+        raise ValueError(f"date_from must be <= date_to, got {date_from} > {date_to}")
 
-    if config is None:
-        return {}
-    if not isinstance(config, dict):
-        raise TypeError(f"expected YAML object at root, got {type(config)}")
-    return config
+    days: list[str] = []
+    current = start
+    while current <= end:
+        days.append(current.isoformat())
+        current += timedelta(days=1)
+    return days

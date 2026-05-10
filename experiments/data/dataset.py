@@ -21,11 +21,7 @@ def _read_text(path: str, storage_options: dict[str, Any]) -> str:
         return file.read()
 
 
-def load_manifest(
-    manifest_uri: str,
-    *,
-    env_path: str = "data_pipeline/.env",
-) -> dict[str, Any]:
+def load_manifest(manifest_uri: str, *, env_path: str) -> dict[str, Any]:
     writer = WriteDispatcher.from_env(Path(env_path))
     return json.loads(_read_text(manifest_uri, writer.s3_storage_options))
 
@@ -33,7 +29,7 @@ def load_manifest(
 def load_registered_dataset(
     manifest_uri: str,
     *,
-    env_path: str = ".env",
+    env_path: str,
 ) -> tuple[dict[str, Any], pd.DataFrame]:
     manifest = load_manifest(manifest_uri, env_path=env_path)
     writer = WriteDispatcher.from_env(Path(env_path))

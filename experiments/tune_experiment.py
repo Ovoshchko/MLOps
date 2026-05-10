@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import math
 from pathlib import Path
 from typing import Any
 
@@ -9,96 +8,25 @@ import matplotlib.pyplot as plt
 import mlflow
 import numpy as np
 import optuna
-from data_pipeline.src.utils import load_yaml_config
 
+from common.yaml import load_yaml_config
 from experiments.data.dataset import load_registered_dataset
 from experiments.data.split import make_train_val_test_split
+from experiments.evaluation import evaluate
 from experiments.features.build import prepare_splits
 from experiments.models.catboost import build_catboost, fit_catboost
+from experiments.reporting import (
+    plot_feature_importance,
+    plot_learning_curves,
+    plot_residuals,
+    plot_true_vs_pred,
+)
 from experiments.tracking.mlflow_tracking import (
     configure_mlflow,
     log_dataset,
     log_split,
     start_run,
 )
-
-
-def _rmse(y_true: np.ndarray, y_pred: np.ndarray) -> float:
-    return float(math.sqrt(np.mean((y_true - y_pred) ** 2)))
-
-
-def _mae(y_true: np.ndarray, y_pred: np.ndarray) -> float:
-    return float(np.mean(np.abs(y_true - y_pred)))
-
-
-def _r2(y_true: np.ndarray, y_pred: np.ndarray) -> float:
-    total = np.sum((y_true - np.mean(y_true)) ** 2)
-    if np.isclose(total, 0.0):
-        return 0.0
-    residual = np.sum((y_true - y_pred) ** 2)
-    return float(1.0 - residual / total)
-
-
-def _evaluate(y_true: np.ndarray, y_pred: np.ndarray, prefix: str) -> dict[str, float]:
-    return {
-        f"{prefix}_rmse": _rmse(y_true, y_pred),
-        f"{prefix}_mae": _mae(y_true, y_pred),
-        f"{prefix}_r2": _r2(y_true, y_pred),
-    }
-
-
-def _plot_learning_curves(evals_result: dict[str, dict[str, list[float]]]):
-    figure, axis = plt.subplots(figsize=(8, 5))
-    for pool_name, pool_metrics in evals_result.items():
-        for metric_name, values in pool_metrics.items():
-            axis.plot(values, label=f"{pool_name}_{metric_name}".lower())
-    axis.set_title("Learning Curves")
-    axis.set_xlabel("Iteration")
-    axis.set_ylabel("Metric value")
-    axis.legend()
-    axis.grid(alpha=0.3)
-    figure.tight_layout()
-    return figure
-
-
-def _plot_true_vs_pred(y_true: np.ndarray, y_pred: np.ndarray):
-    figure, axis = plt.subplots(figsize=(6, 6))
-    axis.scatter(y_true, y_pred, alpha=0.35, s=12)
-    minimum = float(min(np.min(y_true), np.min(y_pred)))
-    maximum = float(max(np.max(y_true), np.max(y_pred)))
-    axis.plot([minimum, maximum], [minimum, maximum], linestyle="--")
-    axis.set_title("True vs Predicted")
-    axis.set_xlabel("True")
-    axis.set_ylabel("Predicted")
-    axis.grid(alpha=0.3)
-    figure.tight_layout()
-    return figure
-
-
-def _plot_residuals(y_true: np.ndarray, y_pred: np.ndarray):
-    residuals = y_true - y_pred
-    figure, axis = plt.subplots(figsize=(7, 5))
-    axis.scatter(y_pred, residuals, alpha=0.35, s=12)
-    axis.axhline(0.0, linestyle="--")
-    axis.set_title("Residuals")
-    axis.set_xlabel("Predicted")
-    axis.set_ylabel("Residual")
-    axis.grid(alpha=0.3)
-    figure.tight_layout()
-    return figure
-
-
-def _plot_feature_importance(feature_importance: list[dict[str, float]]):
-    top_features = feature_importance[:20]
-    names = [row["feature"] for row in reversed(top_features)]
-    values = [row["importance"] for row in reversed(top_features)]
-
-    figure, axis = plt.subplots(figsize=(8, 6))
-    axis.barh(names, values)
-    axis.set_title("Top Feature Importances")
-    axis.set_xlabel("Importance")
-    figure.tight_layout()
-    return figure
 
 
 def _load_config(path: str | Path) -> dict[str, Any]:
@@ -190,19 +118,19 @@ def _log_parent_artifacts(prepared: dict[str, Any], model, test_pred: np.ndarray
         "predictions/test_predictions.json",
     )
 
-    learning_curve_figure = _plot_learning_curves(model.get_evals_result())
+    learning_curve_figure = plot_learning_curves(model.get_evals_result())
     mlflow.log_figure(learning_curve_figure, "plots/learning_curves.png")
     plt.close(learning_curve_figure)
 
-    feature_importance_figure = _plot_feature_importance(feature_importance)
+    feature_importance_figure = plot_feature_importance(feature_importance)
     mlflow.log_figure(feature_importance_figure, "plots/feature_importance.png")
     plt.close(feature_importance_figure)
 
-    true_vs_pred_figure = _plot_true_vs_pred(prepared["y_test"], test_pred)
+    true_vs_pred_figure = plot_true_vs_pred(prepared["y_test"], test_pred)
     mlflow.log_figure(true_vs_pred_figure, "plots/true_vs_pred.png")
     plt.close(true_vs_pred_figure)
 
-    residuals_figure = _plot_residuals(prepared["y_test"], test_pred)
+    residuals_figure = plot_residuals(prepared["y_test"], test_pred)
     mlflow.log_figure(residuals_figure, "plots/residuals.png")
     plt.close(residuals_figure)
 
@@ -231,7 +159,8 @@ def main() -> None:
         strategy=str(config["split"].get("strategy", "random")),
         time_col=config["split"].get("time_col"),
     )
-    prepared = prepare_splits(split, target_col=manifest["target_col"])
+    feature_config = dict(config.get("features", {}))
+    prepared = prepare_splits(split, target_col=manifest["target_col"], feature_config=feature_config)
 
     configure_mlflow(
         tracking_uri=config["mlflow"].get("tracking_uri"),
@@ -296,8 +225,8 @@ def main() -> None:
 
                 model, train_pred, val_pred, _ = _fit_catboost(prepared, model_params)
                 metrics = {}
-                metrics.update(_evaluate(prepared["y_train"], train_pred, "train"))
-                metrics.update(_evaluate(prepared["y_val"], val_pred, "val"))
+                metrics.update(evaluate(prepared["y_train"], train_pred, "train"))
+                metrics.update(evaluate(prepared["y_val"], val_pred, "val"))
                 mlflow.log_metrics(metrics)
 
                 _log_catboost_iteration_metrics(model)
@@ -321,9 +250,9 @@ def main() -> None:
         best_model, train_pred, val_pred, test_pred = _fit_catboost(prepared, best_model_params)
 
         best_metrics = {}
-        best_metrics.update(_evaluate(prepared["y_train"], train_pred, "train"))
-        best_metrics.update(_evaluate(prepared["y_val"], val_pred, "val"))
-        best_metrics.update(_evaluate(prepared["y_test"], test_pred, "test"))
+        best_metrics.update(evaluate(prepared["y_train"], train_pred, "train"))
+        best_metrics.update(evaluate(prepared["y_val"], val_pred, "val"))
+        best_metrics.update(evaluate(prepared["y_test"], test_pred, "test"))
         mlflow.log_metrics(best_metrics)
         _log_catboost_iteration_metrics(best_model)
 

@@ -1,22 +1,14 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 import pandas as pd
 
-from .utils import load_yaml_config
+from common.column_transforms import apply_transforms, normalize_column_transforms
+from common.yaml import load_yaml_config
+
 from .write_dispatcher import WriteDispatcher
-
-
-_COLUMN_TRANSFORM_REGISTRY: dict[str, str] = {
-    "embed": "embed",
-    "log1p": "log1p",
-    "coerce_bool": "coerce_bool",
-    "json_to_string": "json_to_string",
-}
 
 
 class DataTransformer:
@@ -24,6 +16,7 @@ class DataTransformer:
         self.config_path = Path(config_path).resolve()
         self._config: dict[str, Any] | None = None
         self._writer: WriteDispatcher | None = None
+        self._embedder: Any = None
 
     @property
     def config(self) -> dict[str, Any]:
@@ -76,113 +69,41 @@ class DataTransformer:
         return list(self.transform_cfg.get("features_to_select", []))
 
     def column_transforms(self) -> dict[str, list[str]]:
-        raw = self.transform_cfg.get("column_transforms") or {}
-        out: dict[str, list[str]] = {}
-        for k, v in raw.items():
-            if isinstance(v, str):
-                out[str(k)] = [v]
-            elif isinstance(v, list):
-                out[str(k)] = [str(x) for x in v]
-            else:
-                raise TypeError(f"column_transforms.{k}: expected str or list, got {type(v)}")
-        return out
+        return normalize_column_transforms(self.transform_cfg.get("column_transforms"))
 
     def text_vectorizer_name(self) -> str:
-        return str(self.config.get("data_loader", {}).get("text_vectorizer", "intfloat/multilingual-e5-small"))
+        return str(
+            self.config.get("data_loader", {}).get(
+                "text_vectorizer", "intfloat/multilingual-e5-small"
+            )
+        )
 
     def embedding_batch_size(self) -> int:
         return int(self.transform_cfg.get("embedding_batch_size", 32))
 
-    def _select_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        cols = self.features_to_select()
-        out = pd.DataFrame(index=df.index)
-        for c in cols:
-            out[c] = df[c] if c in df.columns else pd.NA
-        return out
-    
-    def _col_embed(self, df: pd.DataFrame, col: str) -> pd.DataFrame:
-        try:
-            from sentence_transformers import SentenceTransformer
-        except ImportError as e:
-            raise RuntimeError(
-                "transform 'embed' requires sentence-transformers (pip install sentence-transformers)."
-            ) from e
-
-        out = df.copy()
-        texts = out[col].fillna("").astype(str).tolist()
-        model = SentenceTransformer(self.text_vectorizer_name())
-        vectors = model.encode(texts, batch_size=self.embedding_batch_size(), show_progress_bar=False)
-        out[f"{col}_embedding"] = [row.tolist() for row in np.asarray(vectors)]
-        return out
-
-    def _col_log1p(self, df: pd.DataFrame, col: str) -> pd.DataFrame:
-        out = df.copy()
-        x = pd.to_numeric(out[col], errors="coerce").clip(lower=0)
-        out[f"{col}_log1p"] = np.log1p(x)
-        return out
-
-    def _col_coerce_bool(self, df: pd.DataFrame, col: str) -> pd.DataFrame:
-        out = df.copy()
-        s = out[col]
-
-        def one(x: Any) -> bool | None:
-            if pd.isna(x):
-                return None
-            if isinstance(x, bool):
-                return x
-            if isinstance(x, (int, float)) and not isinstance(x, bool):
-                if x == 1:
-                    return True
-                if x == 0:
-                    return False
-            if isinstance(x, str):
-                t = x.strip().lower()
-                if t in ("true", "1", "yes"):
-                    return True
-                if t in ("false", "0", "no", ""):
-                    return False
-            return None
-
-        mapped = s.map(one)
-        if mapped.notna().mean() > 0.5:
-            out[col] = mapped.fillna(False).astype(bool)
-        return out
-
-    def _col_json_to_string(self, df: pd.DataFrame, col: str) -> pd.DataFrame:
-        out = df.copy()
-        s = out[col]
-
-        def norm(v: Any) -> Any:
-            if v is None or (isinstance(v, float) and pd.isna(v)):
-                return v
-            if isinstance(v, (dict, list)):
-                return json.dumps(v, ensure_ascii=False, default=str)
-            return v
-
-        sample = s.dropna().head(64)
-        if not sample.empty and any(isinstance(v, (dict, list)) for v in sample):
-            out[col] = s.map(norm)
-        return out
-
-    def _apply_column_transform(self, df: pd.DataFrame, col: str, transform_type: str) -> pd.DataFrame:
-        key = transform_type.strip()
-        method_suffix = _COLUMN_TRANSFORM_REGISTRY.get(key)
-        if method_suffix is None:
-            allowed = ", ".join(sorted(_COLUMN_TRANSFORM_REGISTRY))
-            raise ValueError(f"unknown transform {transform_type!r} for column {col!r}; allowed: {allowed}")
-        method = getattr(self, f"_col_{method_suffix}")
-        return method(df, col)
+    def _embed_model(self) -> Any:
+        if self._embedder is None:
+            try:
+                from sentence_transformers import SentenceTransformer
+            except ImportError as e:
+                raise RuntimeError(
+                    "transform 'embed' requires sentence-transformers "
+                    "(pip install sentence-transformers)."
+                ) from e
+            self._embedder = SentenceTransformer(self.text_vectorizer_name())
+        return self._embedder
 
     def transform_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        out = self._select_features(df)
+        feature_names = self.features_to_select()
         transforms = self.column_transforms()
-
-        for col in self.features_to_select():
-            if col not in out.columns:
-                continue
-            for t in transforms.get(col, []):
-                out = self._apply_column_transform(out, col, t)
-        return out
+        needs_embedder = any("embed" in t for t in transforms.values())
+        return apply_transforms(
+            df,
+            feature_names=feature_names,
+            transforms=transforms,
+            embedder=self._embed_model() if needs_embedder else None,
+            embedding_batch_size=self.embedding_batch_size(),
+        )
 
     def run(self, load_date: str) -> str:
         df = self.read_partition(load_date)
