@@ -134,6 +134,19 @@ def build_X_y(df: pd.DataFrame, feature_columns: dict[str, object]) -> tuple[np.
     return X, y.to_numpy(dtype=np.float32)
 
 
+def build_X(df: pd.DataFrame, feature_columns: dict[str, object]) -> np.ndarray:
+    """Same layout as the X matrix from build_X_y (scalars then vector expansions)."""
+    scalar_block = _build_scalar_block(df, feature_columns["scalar_columns"])
+    vector_block = _build_vector_block(df, feature_columns["vector_columns"])
+    if scalar_block.size == 0 and vector_block.size == 0:
+        raise ValueError("no usable features were found for the current dataset")
+    if scalar_block.size == 0:
+        return vector_block
+    if vector_block.size == 0:
+        return scalar_block
+    return np.concatenate([scalar_block, vector_block], axis=1)
+
+
 def prepare_splits(
     split: dict[str, object],
     *,

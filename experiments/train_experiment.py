@@ -10,6 +10,7 @@ import mlflow
 import numpy as np
 from data_pipeline.src.utils import load_yaml_config
 
+import dotenv
 from experiments.data.dataset import load_registered_dataset
 from experiments.data.split import make_train_val_test_split
 from experiments.features.build import prepare_splits
@@ -17,6 +18,7 @@ from experiments.models.catboost import build_catboost, fit_catboost
 from experiments.models.ridge import fit_ridge, predict_ridge
 from experiments.tracking.mlflow_tracking import (
     configure_mlflow,
+    log_catboost_model,
     log_dataset,
     log_split,
     start_run,
@@ -47,7 +49,7 @@ def _evaluate(y_true: np.ndarray, y_pred: np.ndarray, prefix: str) -> dict[str, 
     }
 
 
-def _transform_target(values: np.ndarray, transform: str) -> np.ndarray:
+def _transform_target(values: np.ndarray, transform: str = "none") -> np.ndarray:
     if transform == "none":
         return values
     if transform == "log1p":
@@ -262,14 +264,17 @@ def _run_catboost(prepared: dict[str, Any], model_params: dict[str, Any], *, tar
     plt.close(feature_importance_figure)
 
     _log_common_plots(prepared, test_pred)
+    log_catboost_model(model, format=["onnx"], input_example=prepared["X_train"][:5])
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run experiment from config.")
-    parser.add_argument("--config", default="experiments/configs/train/ridge.yaml")
+    parser.add_argument("--config", default="experiments/configs/train/catboost_time.yaml")
     return parser
 
 
 def main() -> None:
+    dotenv.load_dotenv()
     args = build_parser().parse_args()
     config = _load_config(args.config)
 

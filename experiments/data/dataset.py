@@ -33,7 +33,7 @@ def load_manifest(
 def load_registered_dataset(
     manifest_uri: str,
     *,
-    env_path: str = "data_pipeline/.env",
+    env_path: str = ".env",
 ) -> tuple[dict[str, Any], pd.DataFrame]:
     manifest = load_manifest(manifest_uri, env_path=env_path)
     writer = WriteDispatcher.from_env(Path(env_path))

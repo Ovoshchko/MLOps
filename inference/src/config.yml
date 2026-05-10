@@ -1,0 +1,13 @@
+mlflow_schema_path: mlflow-artifacts:/2/11684ad61f5e45cfab0af95819a71d79/artifacts/datasets/reddit_technology_2025-11-23_2026-03-01_v1/manifest.json
+input_mapping: {}
+
+embedder:
+  model_name: intfloat/multilingual-e5-small
+  embedding_batch_size: 32
+
+features:
+  title_stats: false
+
+triton:
+  grpc_url: localhost:8001
+  model_name: regression

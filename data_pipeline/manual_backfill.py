@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from datetime import date, timedelta
 
+import dotenv
 from data_pipeline.script_configs import BackfillConfig
 from data_pipeline.src.data_loader import DataLoader
 from data_pipeline.src.data_transformer import DataTransformer
@@ -33,6 +34,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
+    dotenv.load_dotenv()
     args = build_parser().parse_args()
     config = BackfillConfig.from_yaml(args.config)
 

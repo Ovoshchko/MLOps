@@ -5,9 +5,10 @@ import hashlib
 import json
 from dataclasses import asdict, dataclass, field
 from datetime import date, datetime, timedelta, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
+import dotenv
 import fsspec
 import pyarrow.parquet as pq
 
@@ -15,6 +16,7 @@ from data_pipeline.script_configs import DatasetRegistrationConfig
 from data_pipeline.src.utils import load_yaml_config
 from data_pipeline.src.write_dispatcher import WriteDispatcher
 
+dotenv.load_dotenv()
 
 def _iter_dates(date_from: str, date_to: str) -> list[str]:
     start = date.fromisoformat(date_from)
@@ -146,7 +148,8 @@ class DatasetRegistrar:
             digest_source.update(src_path.encode("utf-8"))
             digest_source.update(str(metadata.num_rows).encode("utf-8"))
 
-            dst_path = f"{dataset_uri}/partitions/{Path(src_path).name}"
+            filename = src_path.rstrip("/").split("/")[-1]
+            dst_path = f"{dataset_uri}/partitions/{filename}"
             self._copy_file(src_path, dst_path)
             registered_paths.append(dst_path)
 
@@ -197,7 +200,7 @@ class DatasetRegistrar:
     def _copy_file(self, src_path: str, dst_path: str) -> None:
         if dst_path.startswith("s3://"):
             fs, _, paths = fsspec.get_fs_token_paths(dst_path, storage_options=self.storage_options)
-            fs.makedirs(str(Path(paths[0]).parent), exist_ok=True)
+            fs.makedirs(str(PurePosixPath(paths[0]).parent), exist_ok=True)
         else:
             Path(dst_path).parent.mkdir(parents=True, exist_ok=True)
 

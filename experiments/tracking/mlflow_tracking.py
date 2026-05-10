@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import os
 from contextlib import contextmanager
-from typing import Iterator
+from typing import Any, Iterator
 
 import mlflow
+import mlflow.catboost
 import mlflow.data
+import mlflow.onnx
+import onnx
+import numpy as np
 import pandas as pd
+import yaml
 
 
 def configure_mlflow(
@@ -16,6 +21,10 @@ def configure_mlflow(
 ) -> None:
     mlflow.set_tracking_uri(tracking_uri or os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5001"))
     mlflow.set_experiment(experiment_name or os.getenv("MLFLOW_EXPERIMENT_NAME", "baseline"))
+
+
+def get_data_schema():
+    schema = mlflow.artifacts.download_artifacts("")
 
 
 @contextmanager
@@ -93,3 +102,35 @@ def log_split(split: dict[str, object]) -> None:
         },
         "splits/split.json",
     )
+
+
+def log_catboost_model(
+    model: Any,
+    format: list[str] = ["raw"],
+    input_example: np.ndarray | pd.DataFrame | None = None,
+) -> None:
+    if "onnx" in format:
+        model.save_model(
+            "catboost_regression.onnx",
+            format="onnx",
+            export_parameters={
+                'onnx_domain': 'ai.catboost',
+                'onnx_model_version': 1,
+                'onnx_doc_string': 'Model for Regression',
+                'onnx_graph_name': 'CatBoostModel_for_Regression'
+            }
+        )
+        onnx_model = onnx.load("catboost_regression.onnx")
+
+        mlflow.onnx.log_model(
+            onnx_model,
+            artifact_path="onnx_model",
+            input_example=input_example,
+        )
+
+    if "raw" in format:
+        mlflow.catboost.log_model(
+            model,
+            artifact_path="model",
+            input_example=input_example,
+        )
