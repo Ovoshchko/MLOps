@@ -1,10 +1,10 @@
 name: "regression"
 backend: "onnxruntime"
-max_batch_size: 64
+max_batch_size: 32
 
 dynamic_batching {
-  preferred_batch_size: [ 8, 32 ]
-  max_queue_delay_microseconds: 5000
+  preferred_batch_size: [8, 16]
+  max_queue_delay_microseconds: 1000
 }
 
 instance_group [

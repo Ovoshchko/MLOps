@@ -8,7 +8,6 @@ import pandas as pd
 import tritonclient.grpc as grpcclient
 from fastapi import FastAPI, Request
 from pydantic import BaseModel, ConfigDict
-from sentence_transformers import SentenceTransformer
 
 from common.yaml import load_yaml_config
 from experiments.features.build import apply_feature_engineering, build_X, infer_feature_columns
@@ -57,6 +56,8 @@ def _build_dataframe(rows: list[InputRow]) -> pd.DataFrame:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from sentence_transformers import SentenceTransformer
+
     embed_cfg = config["embedder"]
     triton_cfg = config.get("triton", {})
     app.state.embedder = SentenceTransformer(embed_cfg["model_name"])
