@@ -11,3 +11,15 @@ features:
 triton:
   grpc_url: localhost:8001
   model_name: regression
+
+kafka:
+  run_with_api: true
+  bootstrap_servers: localhost:9092
+  topic: inference.requests
+  response_topic: inference.responses
+  group_id: inference-consumer
+  auto_offset_reset: earliest
+  retry_sleep_seconds: 5.0
+  batch_size: 10
+  batch_poll_timeout_seconds: 1.0
+  max_workers: 4
