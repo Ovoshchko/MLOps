@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -6,7 +7,7 @@ import pandas as pd
 from locust import HttpUser, between, task
 
 BATCH_SIZE = 1
-PARQUET_PATH = "load_date=2025-11-25.parquet"
+PARQUET_PATH = str(Path(__file__).parent / "load_date=2025-11-25.parquet")
 ENDPOINT = os.environ.get("LOCUST_HOST", "http://127.0.0.1:8000")
 
 
