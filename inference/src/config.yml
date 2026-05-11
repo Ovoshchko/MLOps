@@ -1,4 +1,4 @@
-mlflow_schema_path: mlflow-artifacts:/4/09aec333760444ef9766891f553bde03/artifacts/datasets/reddit_technology_2025-03-01_2026-03-01_v1/manifest.json
+mlflow_schema_path: mlflow-artifacts:/2/11684ad61f5e45cfab0af95819a71d79/artifacts/datasets/reddit_technology_2025-11-23_2026-03-01_v1/manifest.json
 input_mapping: {}
 
 embedder:
